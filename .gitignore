@@ -1,0 +1,18 @@
+# Local environment and virtual environments
+.env
+venv/
+
+# Database / Ingestion files
+chroma_db/
+bm25.pkl
+
+# Python compilation files
+__pycache__/
+*.pyc
+
+# Ignore temp files in docs but keep static documents
+docs/tmp*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
