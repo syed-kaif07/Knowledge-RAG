@@ -11,7 +11,7 @@ from src.hyde import build_hyde_chain, expand_query
 from src.config import CHROMA_DIR
 
 st.set_page_config(page_title="RAG - Research Papers", layout="wide")
-st.title("Research Paper RAG")
+st.title("KNOWLEDGE RAG")
 
 # sidebar for uploading and settings
 with st.sidebar:
@@ -46,7 +46,7 @@ with st.sidebar:
     show_src = st.toggle("Show source chunks", value=True)
 
 # load existing index if it exists
-if "vs" not in st.session_state and os.path.exists(CHROMA_DIR):
+if "vs" not in st.session_state and os.path.exists(CHROMA_DIR) and os.path.exists("bm25.pkl"):
     with st.spinner("Loading existing index..."):
         st.session_state["vs"]   = load_vectorstore()
         st.session_state["bm25"] = load_bm25()

@@ -6,12 +6,11 @@ load_dotenv()
 
 # API Keys
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 
 # Models
-LLM_MODEL   = "nvidia/llama-3.1-nemotron-ultra-253b-v1"
-EMBED_MODEL = "models/gemini-embedding-001"
+EMBED_MODEL = "nvidia/nv-embedqa-e5-v5"
+LLM_MODEL   = "meta/llama-3.1-8b-instruct"
 
 # Chunking
 CHUNK_SIZE    = 800

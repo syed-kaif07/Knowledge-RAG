@@ -46,23 +46,22 @@ def get_sources(docs: list[Document]) -> list[dict]:
             })
     return sources
 
-def build_llm(streaming=False):
+def build_llm():
     return ChatNVIDIA(
         model=LLM_MODEL,
         api_key=NVIDIA_API_KEY,
         max_tokens=1024,
         temperature=0.1,
-        streaming=streaming,
     )
 
-def build_rag_chain(streaming=False):
-    llm   = build_llm(streaming=streaming)
+def build_rag_chain():
+    llm   = build_llm()
     chain = RAG_PROMPT | llm | StrOutputParser()
     return chain
 
-def generate_answer(question, docs, streaming=False):
+def generate_answer(question, docs):
     context = format_docs(docs)
-    chain   = build_rag_chain(streaming=streaming)
+    chain   = build_rag_chain()
     return chain.invoke({
         "question": question,
         "context":  context,

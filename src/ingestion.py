@@ -1,11 +1,9 @@
 # src/ingestion.py
-from src.config import GOOGLE_API_KEY
 import os
 import pickle
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
 from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
 from src.config import (
@@ -37,9 +35,10 @@ def chunk_documents(docs):
     return chunks
 
 def get_embeddings():
-    return GoogleGenerativeAIEmbeddings(
-    model=EMBED_MODEL,
-    google_api_key=GOOGLE_API_KEY,
+    return NVIDIAEmbeddings(
+        model=EMBED_MODEL,
+        api_key=NVIDIA_API_KEY,
+        truncate="END",
     )
 
 def build_vectorstore(chunks):
@@ -51,7 +50,7 @@ def build_vectorstore(chunks):
         persist_directory=CHROMA_DIR,
         collection_name=COLLECTION_NAME,
     )
-    print("  Vector store ready ✅")
+    print("  Vector store ready")
     return vectorstore
 
 def load_vectorstore():
@@ -68,7 +67,7 @@ def build_bm25(chunks):
     bm25.k = 20
     with open("bm25.pkl", "wb") as f:
         pickle.dump(bm25, f)
-    print("  BM25 ready ✅")
+    print("  BM25 ready")
     return bm25
 
 def load_bm25():
@@ -81,5 +80,5 @@ def ingest_pipeline():
     chunks = chunk_documents(docs)
     vs     = build_vectorstore(chunks)
     bm25   = build_bm25(chunks)
-    print(f"Done! {len(chunks)} chunks indexed ✅")
+    print(f"Done. {len(chunks)} chunks indexed")
     return vs, bm25, len(chunks)
