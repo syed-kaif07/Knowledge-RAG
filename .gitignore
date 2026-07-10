@@ -1,20 +1,28 @@
-# Local environment and virtual environments
+# API keys and environment
 .env
+
+# Virtual environment
 venv/
 
-# Database / Ingestion files
+# Vector store and indexes
 chroma_db/
 bm25.pkl
+indexed_files.txt
 
-# Python compilation files
+# Python compilation
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Ignore temp files in docs but keep static documents
+# Temp files generated during upload
 docs/tmp*
 
-# OS-specific files
+# OS files
 .DS_Store
 Thumbs.db
 
-docs/
+# Editor files
+.vscode/
+.idea/
+*.swp
