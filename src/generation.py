@@ -54,8 +54,11 @@ def build_llm():
         temperature=0.1,
     )
 
+# module-level instance — reused by app.py as the faithfulness judge
+# so we don't spin up a second NIM client just for scoring
+llm = build_llm()
+
 def build_rag_chain():
-    llm   = build_llm()
     chain = RAG_PROMPT | llm | StrOutputParser()
     return chain
 

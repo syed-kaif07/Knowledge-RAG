@@ -11,11 +11,15 @@ from src.config import NVIDIA_API_KEY, LLM_MODEL
 
 HYDE_PROMPT = ChatPromptTemplate.from_messages([
     ("system", 
-     "You are a research assistant. Write a 3-4 sentence passage "
-     "that directly answers the question below, as if it were an "
-     "excerpt from an academic paper. Do not mention the question itself."),
+     "You are an expert AI and Machine Learning research assistant. "
+     "Write a concise 3-4 sentence passage that directly answers the technical query below.\n"
+     "The passage must read exactly like an excerpt from a peer-reviewed academic paper on Artificial Intelligence, NLP, or LLM Agent architectures.\n"
+     "Strictly confine your response to machine learning frameworks, algorithms, and technical concepts. "
+     "Do not discuss web development, frontend frameworks, general software UI libraries (like React.js), or unrelated domains.\n"
+     "Do not introduce, reference, or mention the question itself."),
     ("human", "{question}"),
 ])
+
 
 def build_hyde_chain():
     llm = ChatNVIDIA(
