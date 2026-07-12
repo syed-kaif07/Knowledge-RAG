@@ -4,7 +4,7 @@ A production-grade RAG system for querying research papers using NVIDIA NIM mode
 
 ## Architecture
 
-![RAG Architecture](assets/rag_architecture.jpg)
+![RAG Architecture](assets/rag_architecture.png)
 
 ## Tech Stack
 
