@@ -145,12 +145,10 @@ with chat_tab:
                 latency_ms=latency_ms,
             )
 
-            # Faithfulness scoring reuses your generation LLM as judge.
-            # generate_answer() must expose the underlying chat model for this
-            # to work — swap `judge_llm` below for whatever object in
-            # src/generation.py wraps your NIM llama-3.1-8b-instruct client.
+            # Faithfulness scoring uses a separate, deterministic (temp=0.0)
+            # NIM client so verdicts don't flip between identical runs.
             try:
-                from src.generation import llm as judge_llm
+                from src.generation import judge_llm
                 logger.score_faithfulness(
                     log_id=log_id,
                     answer=answer,
@@ -158,7 +156,7 @@ with chat_tab:
                     llm_judge=judge_llm,
                 )
             except ImportError:
-                pass  # skip scoring if no importable llm object found
+                pass  # skip scoring if no importable judge_llm object found
 
         st.session_state.messages.append(
             {"role": "assistant", "content": answer}

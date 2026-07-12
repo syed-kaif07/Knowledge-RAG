@@ -146,36 +146,46 @@ class RAGLogger:
         llm_judge: Any,
     ) -> float:
         """
-        Ask an LLM to judge whether each claim in `answer` is supported by
-        the cited chunks. Cheap proxy for RAGAS faithfulness — swap for
-        real RAGAS later without changing the storage schema.
+        Ask an LLM to score, in a single call, what fraction of the answer
+        is supported by the cited chunks. Cheap proxy for RAGAS faithfulness —
+        swap for real RAGAS later without changing the storage schema.
 
-        `llm_judge` must be a LangChain-compatible chat model (e.g. your
-        existing llama-3.1-8b-instruct NIM client) exposing .invoke(str) -> response
-        with a .content attribute, matching standard LangChain ChatModel interface.
+        NOTE: an earlier version of this method split the answer into claims
+        and judged each one separately, averaging supported/total. That
+        produced unstable scores (e.g. 0.14 vs 1.0 vs 0.5 on identical
+        reruns of the same question) because the number of claims extracted
+        varied slightly run to run even at temperature=0.0 -- different
+        denominators made the average swing wildly even when the underlying
+        judgment was similar. Single-shot scoring removes the denominator
+        instability by asking for one score directly instead of averaging
+        over a variable-length claim list.
+
+        `llm_judge` must be a LangChain-compatible chat model exposing
+        .invoke(str) -> response with a .content attribute, matching
+        standard LangChain ChatModel interface. Use a deterministic
+        (temperature=0.0) instance for this -- see generation.py judge_llm.
         """
         context = "\n\n".join(
             f"[{c.chunk_id}] {c.text_preview}" for c in cited_chunks
         )
-        claims = _split_into_claims(answer)
 
-        detail = []
-        supported_count = 0
-        for claim in claims:
-            prompt = (
-                "You are a strict fact-checker. Given the CONTEXT and a CLAIM, "
-                "answer only 'yes' or 'no': is the claim directly supported by "
-                "the context?\n\n"
-                f"CONTEXT:\n{context}\n\nCLAIM:\n{claim}\n\nAnswer (yes/no):"
-            )
-            response = llm_judge.invoke(prompt)
-            verdict = str(getattr(response, "content", response)).strip().lower()
-            supported = verdict.startswith("yes")
-            if supported:
-                supported_count += 1
-            detail.append({"claim": claim, "supported": supported, "raw": verdict})
+        prompt = (
+            "You are a strict fact-checker scoring an AI-generated answer "
+            "against the CONTEXT it was supposed to be grounded in.\n\n"
+            "Score what fraction of the ANSWER is directly supported by the "
+            "CONTEXT, on a scale from 0.0 to 1.0:\n"
+            "- 1.0 = every claim in the answer is backed by the context\n"
+            "- 0.5 = about half the answer is backed by the context\n"
+            "- 0.0 = none of the answer is backed by the context\n\n"
+            "Respond with ONLY a single number between 0.0 and 1.0. "
+            "No words, no explanation.\n\n"
+            f"CONTEXT:\n{context}\n\nANSWER:\n{answer}\n\nScore:"
+        )
+        response = llm_judge.invoke(prompt)
+        raw = str(getattr(response, "content", response)).strip()
 
-        score = supported_count / len(claims) if claims else 0.0
+        score = _parse_score(raw)
+        detail = [{"raw_judge_response": raw, "parsed_score": score}]
 
         conn = sqlite3.connect(self.db_path)
         conn.execute(
@@ -233,9 +243,28 @@ def _chunk_to_dict(c: ChunkRecord) -> dict:
 
 def _split_into_claims(answer: str) -> list[str]:
     """
-    Naive sentence-level claim splitter. Good enough for a portfolio project;
-    swap for a proper claim-extraction LLM call if you want higher fidelity.
+    Naive sentence-level claim splitter. Kept for reference / potential
+    future use (e.g. a claim-level detail view), but no longer used by
+    score_faithfulness — see the note in that method for why.
     """
     import re
     sentences = re.split(r"(?<=[.!?])\s+", answer.strip())
     return [s.strip() for s in sentences if len(s.strip()) > 10]
+
+
+def _parse_score(raw: str) -> float:
+    """
+    Extract a float in [0.0, 1.0] from the judge's raw response text.
+    Judges occasionally wrap the number in stray text despite instructions
+    ("Score: 0.8" or "0.8." etc.) so this pulls the first valid float found
+    rather than assuming the response is a bare number.
+    """
+    import re
+    match = re.search(r"(\d*\.?\d+)", raw)
+    if not match:
+        return 0.0
+    try:
+        value = float(match.group(1))
+    except ValueError:
+        return 0.0
+    return max(0.0, min(1.0, value))

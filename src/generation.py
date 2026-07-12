@@ -54,9 +54,20 @@ def build_llm():
         temperature=0.1,
     )
 
-# module-level instance — reused by app.py as the faithfulness judge
-# so we don't spin up a second NIM client just for scoring
+# module-level instance — used for actual answer generation
 llm = build_llm()
+
+# separate deterministic instance for faithfulness judging.
+# temperature=0.1 on the generation llm was causing the judge to flip
+# verdicts on borderline claims between identical runs, which made the
+# faithfulness score swing wildly (e.g. 30% vs 57% on the same question).
+# temperature=0.0 makes the judge's yes/no calls consistent run to run.
+judge_llm = ChatNVIDIA(
+    model=LLM_MODEL,
+    api_key=NVIDIA_API_KEY,
+    max_tokens=10,
+    temperature=0.0,
+)
 
 def build_rag_chain():
     chain = RAG_PROMPT | llm | StrOutputParser()

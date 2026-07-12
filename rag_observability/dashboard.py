@@ -70,7 +70,13 @@ def render_observability_tab(logger):
 
             if row.get("faithfulness_detail"):
                 detail = json.loads(row["faithfulness_detail"])
-                st.write("**Per-claim support:**")
-                for d in detail:
-                    label = "supported" if d["supported"] else "not supported"
-                    st.caption(f"[{label}] {d['claim']}")
+                if detail and "raw_judge_response" in detail[0]:
+                    st.write("**Faithfulness judge response:**")
+                    st.caption(detail[0]["raw_judge_response"])
+                else:
+                    # backward compatibility with logs from the old
+                    # per-claim scoring method
+                    st.write("**Per-claim support:**")
+                    for d in detail:
+                        label = "supported" if d.get("supported") else "not supported"
+                        st.caption(f"[{label}] {d.get('claim', '')}")
