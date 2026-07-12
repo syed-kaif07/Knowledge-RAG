@@ -22,6 +22,11 @@ import json
 def render_observability_tab(logger):
     st.subheader("Retrieval Observability")
 
+    if st.button("Clear all logs", type="secondary"):
+        logger.clear_all()
+        st.success("Logs cleared.")
+        st.rerun()
+
     trend = logger.get_faithfulness_trend()
     if trend:
         df = pd.DataFrame(trend, columns=["timestamp", "faithfulness_score"])

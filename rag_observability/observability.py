@@ -206,6 +206,13 @@ class RAGLogger:
         conn.close()
         return rows
 
+    def clear_all(self):
+        """Wipe all logged queries. Irreversible — use for resetting during dev/testing."""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("DELETE FROM queries")
+        conn.commit()
+        conn.close()
+
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -13,8 +13,8 @@ EMBED_MODEL = "nvidia/nv-embedqa-e5-v5"
 LLM_MODEL   = "meta/llama-3.1-8b-instruct"
 
 # Chunking
-CHUNK_SIZE    = 800
-CHUNK_OVERLAP = 80
+CHUNK_SIZE    = 900
+CHUNK_OVERLAP = 70
 
 # Retrieval
 RETRIEVE_K   = 20   # fetch before rerank
