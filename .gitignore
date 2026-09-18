@@ -26,3 +26,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Local evaluation workflow (ignored from git)
+eval_workflow/
+
+retrieval_results/

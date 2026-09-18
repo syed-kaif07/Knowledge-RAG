@@ -2,26 +2,25 @@
 import os
 import time
 import streamlit as st
+import pandas as pd
 from src.ingestion import ingest_pipeline, load_vectorstore, load_bm25, get_new_files
 from src.retrieval import retrieve
 from src.generation import generate_answer, get_sources
 from src.hyde import build_hyde_chain, expand_query
 from src.config import CHROMA_DIR
-from rag_observability.observability import RAGLogger, ChunkRecord
-from rag_observability.dashboard import render_observability_tab
+from src.eval_ragas import evaluate_query_ragas
 
 st.set_page_config(page_title="Research Paper RAG", layout="wide")
 st.title("KNOWLEDGE RAG")
 
+# Session state initialization
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-@st.cache_resource
-def get_logger():
-    return RAGLogger(db_path="rag_logs.db")
+if "ragas_history" not in st.session_state:
+    st.session_state.ragas_history = []
 
-
-logger = get_logger()
-
-chat_tab, obs_tab = st.tabs(["Chat", "Observability"])
+chat_tab, obs_tab = st.tabs(["Chat", "RAGAS Evaluation"])
 
 with st.sidebar:
     st.header("Upload Papers")
@@ -61,6 +60,7 @@ with st.sidebar:
     st.divider()
     use_hyde = st.toggle("HyDE query expansion", value=True)
     show_src = st.toggle("Show source chunks", value=True)
+    enable_eval = st.toggle("Run live RAGAS evaluation", value=True)
 
 # auto-load existing index on every page load
 if "vs" not in st.session_state and os.path.exists(CHROMA_DIR) and os.path.exists("bm25.pkl"):
@@ -69,13 +69,17 @@ if "vs" not in st.session_state and os.path.exists(CHROMA_DIR) and os.path.exist
         st.session_state["bm25"] = load_bm25()
     st.sidebar.success("Index loaded automatically")
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
 with chat_tab:
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+            if msg.get("ragas_scores"):
+                scores = msg["ragas_scores"]
+                with st.expander("Evaluation Metrics (RAGAS 0.4.3)"):
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Faithfulness", f"{scores['faithfulness']:.0%}")
+                    c2.metric("Answer Relevancy", f"{scores['answer_relevancy']:.0%}")
+                    c3.metric("Context Utilization", f"{scores['context_utilization']:.0%}")
 
     if question := st.chat_input("Ask anything about your research papers..."):
         if "vs" not in st.session_state:
@@ -122,45 +126,61 @@ with chat_tab:
                 with st.expander("HyDE hypothetical document"):
                     st.caption(hyde_doc)
 
-            # --- observability logging ---
-            # docs are LangChain Documents from retrieve(); if your retrieve()
-            # attaches score fields to metadata (e.g. "rrf_score", "rerank_score"),
-            # ChunkRecord.from_langchain_doc will pick them up automatically.
-            # Adjust the metadata keys below if your pipeline names them differently.
-            chunk_records = [
-                ChunkRecord.from_langchain_doc(
-                    d,
-                    rrf_score=d.metadata.get("rrf_score"),
-                    rerank_score=d.metadata.get("rerank_score"),
-                )
-                for d in docs
-            ]
-
-            log_id = logger.log_query(
-                query=question,
-                retrieved_chunks=chunk_records,
-                final_context_chunks=chunk_records,
-                answer=answer,
-                hyde_used=use_hyde,
-                latency_ms=latency_ms,
-            )
-
-            # Faithfulness scoring uses a separate, deterministic (temp=0.0)
-            # NIM client so verdicts don't flip between identical runs.
-            try:
-                from src.generation import judge_llm
-                logger.score_faithfulness(
-                    log_id=log_id,
-                    answer=answer,
-                    cited_chunks=chunk_records,
-                    llm_judge=judge_llm,
-                )
-            except ImportError:
-                pass  # skip scoring if no importable judge_llm object found
+            # --- RAGAS 0.4.3 Online Evaluation (Non-critical execution) ---
+            ragas_scores = None
+            if enable_eval and docs:
+                try:
+                    with st.spinner("Running RAGAS evaluation..."):
+                        context_texts = [d.page_content for d in docs]
+                        ragas_scores = evaluate_query_ragas(question, answer, context_texts)
+                        if ragas_scores:
+                            ragas_entry = {
+                                "query": question,
+                                "latency_ms": latency_ms,
+                                **ragas_scores
+                            }
+                            st.session_state.ragas_history.append(ragas_entry)
+                            with st.expander("Evaluation Metrics (RAGAS 0.4.3)"):
+                                c1, c2, c3 = st.columns(3)
+                                c1.metric("Faithfulness", f"{ragas_scores['faithfulness']:.0%}")
+                                c2.metric("Answer Relevancy", f"{ragas_scores['answer_relevancy']:.0%}")
+                                c3.metric("Context Utilization", f"{ragas_scores['context_utilization']:.0%}")
+                except Exception as e:
+                    print(f"[RAGAS Warning] Evaluation skipped: {e}")
 
         st.session_state.messages.append(
-            {"role": "assistant", "content": answer}
+            {"role": "assistant", "content": answer, "ragas_scores": ragas_scores}
         )
 
 with obs_tab:
-    render_observability_tab(logger)
+    st.subheader("RAGAS 0.4.3 Evaluation Dashboard")
+
+    if not st.session_state.ragas_history:
+        st.info("No queries evaluated in this session yet. Ask a question in the Chat tab to view real-time RAGAS metrics.")
+    else:
+        df_history = pd.DataFrame(st.session_state.ragas_history)
+
+        avg_faith = df_history["faithfulness"].mean()
+        avg_rel   = df_history["answer_relevancy"].mean()
+        avg_util  = df_history["context_utilization"].mean()
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Avg Faithfulness", f"{avg_faith:.0%}")
+        m2.metric("Avg Answer Relevancy", f"{avg_rel:.0%}")
+        m3.metric("Avg Context Utilization", f"{avg_util:.0%}")
+        m4.metric("Total Evaluated", len(df_history))
+
+        st.divider()
+        st.subheader("Session Metric Trends")
+        st.line_chart(df_history[["faithfulness", "answer_relevancy", "context_utilization"]])
+
+        st.divider()
+        st.subheader("Evaluated Queries Log")
+        for i, row in df_history.iloc[::-1].iterrows():
+            with st.expander(f"Query {i+1}: {row['query'][:80]}"):
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Faithfulness", f"{row['faithfulness']:.0%}")
+                c2.metric("Answer Relevancy", f"{row['answer_relevancy']:.0%}")
+                c3.metric("Context Utilization", f"{row['context_utilization']:.0%}")
+                if "latency_ms" in row and pd.notnull(row["latency_ms"]):
+                    st.caption(f"Latency: {row['latency_ms']:.0f} ms")
