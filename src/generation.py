@@ -25,7 +25,16 @@ def format_docs(docs: list[Document]) -> str:
     for doc in docs:
         source = doc.metadata.get("source", "unknown")
         page   = doc.metadata.get("page", "")
-        label  = source + (f" page {page}" if page != "" else "")
+        header = doc.metadata.get("Header 2") or doc.metadata.get("Header 1") or ""
+        
+        details = []
+        if page != "":
+            details.append(f"page {page}")
+        if header != "":
+            details.append(f"section: {header}")
+            
+        detail_str = f" ({', '.join(details)})" if details else ""
+        label  = f"{source}{detail_str}"
         parts.append(f"[{label}]\n{doc.page_content}")
     return "\n\n---\n\n".join(parts)
 
@@ -36,12 +45,14 @@ def get_sources(docs: list[Document]) -> list[dict]:
     for doc in docs:
         source = doc.metadata.get("source", "unknown")
         page   = doc.metadata.get("page", "")
-        key    = f"{source}-{page}"
+        header = doc.metadata.get("Header 2") or doc.metadata.get("Header 1") or ""
+        key    = f"{source}-{page}-{header}"
         if key not in seen:
             seen.add(key)
             sources.append({
                 "source":  source,
                 "page":    page,
+                "header":  header,
                 "snippet": doc.page_content[:200] + "...",
             })
     return sources
@@ -74,9 +85,16 @@ def build_rag_chain():
     return chain
 
 def generate_answer(question, docs):
+    import time
     context = format_docs(docs)
     chain   = build_rag_chain()
-    return chain.invoke({
-        "question": question,
-        "context":  context,
-    })
+    for attempt in range(3):
+        try:
+            return chain.invoke({
+                "question": question,
+                "context":  context,
+            })
+        except Exception as e:
+            if attempt == 2:
+                raise e
+            time.sleep(2)

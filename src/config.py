@@ -20,9 +20,19 @@ CHUNK_OVERLAP = 70
 RETRIEVE_K   = 20   # fetch before rerank
 RERANK_TOP_N = 5    # keep after rerank
 
-# Vector Store
+# Vector Store (PyPDF Standard)
 CHROMA_DIR      = "./chroma_db"
 COLLECTION_NAME = "rag_papers"
+BM25_PKL        = "bm25.pkl"
+INDEXED_LOG     = "indexed_files.txt"
 
-# Docs folder
-DOCS_DIR = "./docs"
+# Vector Store (LlamaParse Markdown)
+CHROMA_DIR_LLAMAPARSE      = "./chroma_db_llamaparse"
+COLLECTION_NAME_LLAMAPARSE = "rag_papers_llamaparse"
+BM25_PKL_LLAMAPARSE        = "bm25_llamaparse.pkl"
+INDEXED_LOG_LLAMAPARSE     = "indexed_llamaparse_files.txt"
+
+# Docs folders
+DOCS_DIR        = "./docs"
+PARSED_DOCS_DIR = "./parsed_docs/llamaparse"
+

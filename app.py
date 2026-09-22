@@ -4,10 +4,19 @@ import time
 import streamlit as st
 import pandas as pd
 from src.ingestion import ingest_pipeline, load_vectorstore, load_bm25, get_new_files
+from src.markdown_ingestion import (
+    ingest_llamaparse_pipeline,
+    load_llamaparse_vectorstore,
+    load_llamaparse_bm25,
+    get_new_llamaparse_files
+)
 from src.retrieval import retrieve
 from src.generation import generate_answer, get_sources
 from src.hyde import build_hyde_chain, expand_query
-from src.config import CHROMA_DIR
+from src.config import (
+    CHROMA_DIR, BM25_PKL,
+    CHROMA_DIR_LLAMAPARSE, BM25_PKL_LLAMAPARSE
+)
 from src.eval_ragas import evaluate_query_ragas
 
 st.set_page_config(page_title="Research Paper RAG", layout="wide")
@@ -20,54 +29,95 @@ if "messages" not in st.session_state:
 if "ragas_history" not in st.session_state:
     st.session_state.ragas_history = []
 
+if "active_mode" not in st.session_state:
+    st.session_state.active_mode = None
+
 chat_tab, obs_tab = st.tabs(["Chat", "RAGAS Evaluation"])
 
 with st.sidebar:
-    st.header("Upload Papers")
-    uploaded = st.file_uploader(
-        "Upload PDF files",
-        accept_multiple_files=True,
-        type=["pdf"],
+    st.header("Knowledge Base Settings")
+    
+    index_mode = st.radio(
+        "Select Index Collection",
+        ["LlamaParse (Markdown Docs)", "PyPDF (Standard Docs)"],
+        index=0,
+        help="Choose between structured LlamaParse markdown index or raw PyPDF chunk index."
     )
+    
+    # Reload store if switching modes
+    mode_key = "llamaparse" if "LlamaParse" in index_mode else "pypdf"
+    if st.session_state.active_mode != mode_key:
+        st.session_state.active_mode = mode_key
+        st.session_state.pop("vs", None)
+        st.session_state.pop("bm25", None)
 
-    if uploaded:
-        # save with original filename, no temp files
-        saved = []
-        for f in uploaded:
-            dest = os.path.join("./docs", f.name)
-            if not os.path.exists(dest):
-                with open(dest, "wb") as out:
-                    out.write(f.read())
-                saved.append(f.name)
+    st.divider()
+    st.header("Upload & Ingestion")
 
-        if saved:
-            st.info(f"Saved {len(saved)} new file(s): {', '.join(saved)}")
+    if mode_key == "pypdf":
+        uploaded = st.file_uploader(
+            "Upload PDF files for PyPDF",
+            accept_multiple_files=True,
+            type=["pdf"],
+        )
+        if uploaded:
+            saved = []
+            for f in uploaded:
+                dest = os.path.join("./docs", f.name)
+                if not os.path.exists(dest):
+                    with open(dest, "wb") as out:
+                        out.write(f.read())
+                    saved.append(f.name)
+            if saved:
+                st.info(f"Saved {len(saved)} new file(s): {', '.join(saved)}")
+            else:
+                st.info("All uploaded files already exist in docs/")
+
+        if st.button("Index New PDFs"):
+            new_files = get_new_files()
+            if not new_files:
+                st.success("All PDFs are already indexed.")
+            else:
+                with st.spinner(f"Indexing {len(new_files)} new file(s)..."):
+                    vs, bm25, n = ingest_pipeline()
+                    if vs and bm25:
+                        st.session_state["vs"] = vs
+                        st.session_state["bm25"] = bm25
+                        st.success(f"Indexed {n} new chunks from {len(new_files)} file(s)")
+
+    else:
+        # LlamaParse Markdown mode
+        unindexed_mds = get_new_llamaparse_files()
+        if unindexed_mds:
+            st.warning(f"Found {len(unindexed_mds)} unindexed markdown document(s) in parsed_docs/")
         else:
-            st.info("All uploaded files already exist in docs/")
+            st.success("All parsed markdown documents are indexed.")
 
-    if st.button("Index New Documents"):
-        new_files = get_new_files()
-        if not new_files:
-            st.success("Nothing new to index — all docs already indexed.")
-        else:
-            with st.spinner(f"Indexing {len(new_files)} new file(s)..."):
-                vs, bm25, n = ingest_pipeline()
+        if st.button("Index Markdown Documents"):
+            with st.spinner("Indexing markdown documents..."):
+                vs, bm25, n = ingest_llamaparse_pipeline()
                 if vs and bm25:
-                    st.session_state["vs"]   = vs
+                    st.session_state["vs"] = vs
                     st.session_state["bm25"] = bm25
-                    st.success(f"Indexed {n} new chunks from {len(new_files)} file(s)")
+                    st.success(f"Indexed {n} new chunks from {len(unindexed_mds)} markdown file(s)")
 
     st.divider()
     use_hyde = st.toggle("HyDE query expansion", value=True)
     show_src = st.toggle("Show source chunks", value=True)
     enable_eval = st.toggle("Run live RAGAS evaluation", value=True)
 
-# auto-load existing index on every page load
-if "vs" not in st.session_state and os.path.exists(CHROMA_DIR) and os.path.exists("bm25.pkl"):
-    with st.spinner("Loading existing index..."):
-        st.session_state["vs"]   = load_vectorstore()
-        st.session_state["bm25"] = load_bm25()
-    st.sidebar.success("Index loaded automatically")
+# Auto-load existing index for active mode
+if "vs" not in st.session_state:
+    if mode_key == "pypdf" and os.path.exists(CHROMA_DIR) and os.path.exists(BM25_PKL):
+        with st.spinner("Loading PyPDF index..."):
+            st.session_state["vs"] = load_vectorstore()
+            st.session_state["bm25"] = load_bm25()
+        st.sidebar.success("PyPDF index loaded")
+    elif mode_key == "llamaparse" and os.path.exists(CHROMA_DIR_LLAMAPARSE) and os.path.exists(BM25_PKL_LLAMAPARSE):
+        with st.spinner("Loading LlamaParse index..."):
+            st.session_state["vs"] = load_llamaparse_vectorstore()
+            st.session_state["bm25"] = load_llamaparse_bm25()
+        st.sidebar.success("LlamaParse index loaded")
 
 with chat_tab:
     for msg in st.session_state.messages:
@@ -82,8 +132,8 @@ with chat_tab:
                     c3.metric("Context Utilization", f"{scores['context_utilization']:.0%}")
 
     if question := st.chat_input("Ask anything about your research papers..."):
-        if "vs" not in st.session_state:
-            st.error("No index found. Upload PDFs and click Index New Documents first.")
+        if "vs" not in st.session_state or st.session_state.get("vs") is None:
+            st.error("No index found for the selected mode. Click index in the sidebar first.")
             st.stop()
 
         st.session_state.messages.append({"role": "user", "content": question})
@@ -91,15 +141,15 @@ with chat_tab:
             st.markdown(question)
 
         with st.chat_message("assistant"):
-            vs   = st.session_state["vs"]
+            vs = st.session_state["vs"]
             bm25 = st.session_state["bm25"]
 
             search_query = question
-            hyde_doc     = None
+            hyde_doc = None
             if use_hyde:
-                hyde_chain   = build_hyde_chain()
+                hyde_chain = build_hyde_chain()
                 search_query = expand_query(question, hyde_chain)
-                hyde_doc     = search_query
+                hyde_doc = search_query
 
             start = time.time()
 
@@ -117,8 +167,13 @@ with chat_tab:
                 with st.expander(f"Sources ({len(sources)} chunks)"):
                     for s in sources:
                         label = s["source"]
-                        if s["page"] != "":
-                            label += f" - page {s['page']}"
+                        extras = []
+                        if s.get("page"):
+                            extras.append(f"page {s['page']}")
+                        if s.get("header"):
+                            extras.append(f"section: {s['header']}")
+                        if extras:
+                            label += f" ({', '.join(extras)})"
                         st.markdown(f"**{label}**")
                         st.caption(s["snippet"])
 
@@ -161,8 +216,8 @@ with obs_tab:
         df_history = pd.DataFrame(st.session_state.ragas_history)
 
         avg_faith = df_history["faithfulness"].mean()
-        avg_rel   = df_history["answer_relevancy"].mean()
-        avg_util  = df_history["context_utilization"].mean()
+        avg_rel = df_history["answer_relevancy"].mean()
+        avg_util = df_history["context_utilization"].mean()
 
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Avg Faithfulness", f"{avg_faith:.0%}")
@@ -183,4 +238,4 @@ with obs_tab:
                 c2.metric("Answer Relevancy", f"{row['answer_relevancy']:.0%}")
                 c3.metric("Context Utilization", f"{row['context_utilization']:.0%}")
                 if "latency_ms" in row and pd.notnull(row["latency_ms"]):
-                    st.caption(f"Latency: {row['latency_ms']:.0f} ms")
+                    st.caption(f"Latency: {row['latency_ms']:.0f} ms")
