@@ -1,19 +1,31 @@
 # API keys and environment
 .env
+.env.*
+*.env
 
 # Virtual environment
 venv/
+.venv/
+env/
 
-# Vector store and indexes
+# Vector stores and search indexes
 chroma_db/
+chroma_db_llamaparse/
+chroma_db*/
+*.pkl
 bm25.pkl
+bm25_llamaparse.pkl
 indexed_files.txt
+indexed_llamaparse_files.txt
+indexed*.txt
+*.sqlite3
+*.db
 
-# Python compilation
+# Python compilation and caches
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 
 # Temp files generated during upload
 docs/tmp*
@@ -21,13 +33,15 @@ docs/tmp*
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Editor files
 .vscode/
 .idea/
 *.swp
+*.swo
 
-# Local evaluation workflow (ignored from git)
+# Local evaluation workflow and results
 eval_workflow/
-
 retrieval_results/
+baseline_results.json
