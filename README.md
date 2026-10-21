@@ -4,6 +4,22 @@ A fast, accurate RAG system for querying AI and machine learning research papers
 
 ---
 
+## Problem
+Reading and synthesizing machine learning research papers takes hours of tedious effort. When you turn to typical AI chatbots for quick answers, they often scramble complex tables, miss key math formulas, or confidently invent facts you have to double-check anyway. You end up having to read the whole paper manually because you simply cannot trust whether the AI is telling the truth.
+
+## Solution
+I built Knowledge RAG to create a research partner you can actually trust. It preserves the original structure of papers so tables and equations don't get lost, uses a blend of keyword and semantic search to pull the exact right passages, and grades its own answers on the fly—showing you live scores for accuracy and grounding so you never have to second-guess the findings.
+
+## Current Bottlenecks & Areas to Improve
+No system is perfect, and here are the honest trade-offs and areas currently being worked on:
+
+1. **Live Evaluation Delay:** Running real-time grading with RAGAS on every single question adds about 5–8 seconds of waiting time, because an evaluator AI has to carefully inspect the answer before it finishes.
+2. **Connecting Dots Across Multiple Papers:** The system is great at finding facts inside specific papers, but answering complex questions that require piecing together clues scattered across several different papers at once can still challenge a single search pass.
+3. **Scaling Beyond Dozens of Papers:** Keyword search indices are currently stored as local files (`.pkl`), which runs blazing fast for tens of papers, but will need a dedicated search database once the library grows into thousands of documents.
+4. **Initial Processing Time:** Converting heavy PDFs into clean markdown via LlamaParse preserves tables and math beautifully, but the initial conversion takes noticeable time and relies on an external API.
+
+---
+
 ## Key Highlights
 
 - **Dual Ingestion Pipelines**:
@@ -27,22 +43,6 @@ A fast, accurate RAG system for querying AI and machine learning research papers
 ## Architecture & Pipeline
 
 ![RAG Architecture](assets/rag_architecture.png)
-
-```
-Query ──► [HyDE Expansion] ──► Hybrid Retrieval (Chroma Dense + BM25 Sparse)
-                                             │
-                                             ▼
-                                  Reciprocal Rank Fusion (RRF)
-                                             │
-                                             ▼
-                                  Cohere Rerank (Top 20 -> Top 5)
-                                             │
-                                             ▼
-                                  NVIDIA LLM (Grounded Generation)
-                                             │
-                                             ▼
-                                  RAGAS Evaluation & Streamlit UI
-```
 
 ---
 

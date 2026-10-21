@@ -41,7 +41,12 @@ desktop.ini
 *.swp
 *.swo
 
-# Local evaluation workflow and results
-eval_workflow/
+# Local evaluation results (ignore generated benchmark outputs, keep code)
+eval_workflow/*.json
+eval_workflow/baseline_results.json
 retrieval_results/
 baseline_results.json
+
+# Logs and test caches
+*.log
+.pytest_cache/
