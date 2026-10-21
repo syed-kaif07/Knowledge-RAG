@@ -86,6 +86,8 @@ RAG/
 ├── parse_all_pdfs.py             # CLI script to parse all PDFs to markdown via LlamaParse
 ├── index_llamaparse.py           # CLI script to batch-index markdown documents
 ├── app.py                         # Streamlit chat interface & evaluation dashboard
+├── Dockerfile                    # Container configuration (Python 3.12-slim)
+├── .dockerignore                 # Excludes venv, caches, and secrets from image
 ├── requirements.txt              # Python dependencies
 └── .env                          # API keys
 ```
@@ -128,7 +130,7 @@ LLAMA_CLOUD_API_KEY=your_llama_cloud_api_key_here
 - **PyPDF Standard Mode**:
   - Upload PDFs in the sidebar and click **Index New PDFs**.
 
-### 2. Run the Web App
+### 2. Run the Web App (Locally)
 ```bash
 streamlit run app.py
 ```
@@ -136,7 +138,27 @@ streamlit run app.py
 - Toggle **HyDE**, **Source Chunks**, and **Live RAGAS evaluation** on demand.
 - View real-time scores and aggregate trends under the **RAGAS Evaluation** tab.
 
-### 3. Run Benchmark Evaluation
+### 3. Run with Docker (Alternative)
+Run the entire application in an isolated container without installing Python dependencies locally:
+
+1. **Build the image:**
+   ```bash
+   docker build -t knowledgerag .
+   ```
+
+2. **Run the container (passing your `.env` file):**
+   ```bash
+   # Default port 8501:
+   docker run -p 8501:8501 --env-file .env knowledgerag
+
+   # Or map to a custom port (e.g., 8080):
+   docker run -p 8080:8501 --env-file .env knowledgerag
+   ```
+
+3. **Access the application:**
+   Open `http://localhost:8501` (or `http://localhost:8080`) in your browser.
+
+### 4. Run Benchmark Evaluation
 ```bash
 python eval_workflow/run_baseline_eval.py
 ```
