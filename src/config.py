@@ -4,13 +4,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# API Keys
+# API Keys & Database URI
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+MONGO_URI      = os.getenv("MONGO_URI")
+
+# MongoDB Atlas Configuration
+MONGO_DB_NAME                 = "knowledge_rag"
+MONGO_COLLECTION_PYPDF        = "rag_papers_pypdf"
+MONGO_COLLECTION_LLAMAPARSE   = "rag_papers_llamaparse"
+MONGO_VECTOR_INDEX_NAME       = "vector_index"
+MONGO_SEARCH_INDEX_NAME       = "search_index"
 
 # Models
 EMBED_MODEL = "nvidia/llama-nemotron-embed-vl-1b-v2"
-LLM_MODEL   = "nvidia/nemotron-3-ultra-550b-a55b"
+LLM_MODEL   = "nvidia/nemotron-3.5-lightning-30b-a3b"
 
 # Chunking
 CHUNK_SIZE    = 900
