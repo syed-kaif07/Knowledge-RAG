@@ -12,7 +12,6 @@ from src.markdown_ingestion import (
 )
 from src.retrieval import retrieve
 from src.generation import generate_answer, get_sources
-from src.hyde import build_hyde_chain, expand_query
 from src.config import (
     CHROMA_DIR, BM25_PKL,
     CHROMA_DIR_LLAMAPARSE, BM25_PKL_LLAMAPARSE
@@ -102,9 +101,8 @@ with st.sidebar:
                     st.success(f"Indexed {n} new chunks from {len(unindexed_mds)} markdown file(s)")
 
     st.divider()
-    use_hyde = st.toggle("HyDE query expansion", value=True)
     show_src = st.toggle("Show source chunks", value=True)
-    enable_eval = st.toggle("Run live RAGAS evaluation", value=True)
+    enable_eval = st.toggle("Run live RAGAS evaluation", value=False)
 
 # Auto-load existing index for active mode
 if "vs" not in st.session_state:
@@ -144,17 +142,10 @@ with chat_tab:
             vs = st.session_state["vs"]
             bm25 = st.session_state["bm25"]
 
-            search_query = question
-            hyde_doc = None
-            if use_hyde:
-                hyde_chain = build_hyde_chain()
-                search_query = expand_query(question, hyde_chain)
-                hyde_doc = search_query
-
             start = time.time()
 
             with st.spinner("Searching papers..."):
-                docs = retrieve(search_query, vs, bm25)
+                docs = retrieve(question, vs, bm25)
 
             with st.spinner("Generating answer..."):
                 answer = generate_answer(question, docs)
@@ -177,9 +168,6 @@ with chat_tab:
                         st.markdown(f"**{label}**")
                         st.caption(s["snippet"])
 
-            if use_hyde and hyde_doc:
-                with st.expander("HyDE hypothetical document"):
-                    st.caption(hyde_doc)
 
             # --- RAGAS 0.4.3 Online Evaluation (Non-critical execution) ---
             ragas_scores = None

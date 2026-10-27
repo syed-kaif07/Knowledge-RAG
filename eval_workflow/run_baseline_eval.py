@@ -8,7 +8,6 @@ import pandas as pd
 from src.ingestion import load_vectorstore, load_bm25
 from src.retrieval import retrieve
 from src.generation import generate_answer
-from src.hyde import build_hyde_chain, expand_query
 from src.eval_ragas import evaluate_query_ragas
 from src.config import CHROMA_DIR
 
@@ -49,7 +48,6 @@ def run_baseline_evaluation():
     print("\n[1/3] Loading VectorStore and BM25 Index...")
     vectorstore = load_vectorstore()
     bm25 = load_bm25()
-    hyde_chain = build_hyde_chain()
     print("  Index loaded successfully.")
 
     results = []
@@ -59,11 +57,8 @@ def run_baseline_evaluation():
         print(f"--- Question [{idx}/{len(BENCHMARK_QUESTIONS)}]: '{question[:60]}...' ---")
         start_time = time.time()
 
-        # Step 1: HyDE query expansion
-        search_query = expand_query(question, hyde_chain)
-
-        # Step 2: Hybrid retrieval + RRF + Cohere rerank
-        retrieved_docs = retrieve(search_query, vectorstore, bm25)
+        # Step 1: Hybrid retrieval + RRF + Cohere rerank
+        retrieved_docs = retrieve(question, vectorstore, bm25)
         contexts = [doc.page_content for doc in retrieved_docs]
 
         # Step 3: NVIDIA Answer generation

@@ -1,6 +1,6 @@
 # Knowledge RAG
 
-A fast, accurate RAG system for querying AI and machine learning research papers using NVIDIA NIM models, hybrid search (Chroma + BM25), Cohere reranking, HyDE expansion, LlamaParse markdown indexing, and live RAGAS evaluation.
+A fast, accurate RAG system for querying AI and machine learning research papers using NVIDIA NIM models, hybrid search (MongoDB Atlas Vector Search + BM25), Cohere reranking, LlamaParse markdown indexing, and live RAGAS evaluation.
 
 ---
 
@@ -26,13 +26,12 @@ No system is perfect, and here are the honest trade-offs and areas currently bei
   - **LlamaParse Pipeline**: Converts PDFs into Markdown to preserve complex tables, equations, and code. Employs `MarkdownHeaderTextSplitter` + recursive token chunking.
   - **PyPDF Pipeline**: Fast, page-based parsing with recursive character splitting.
 - **Isolated Vector & Sparse Indices**:
-  - PyPDF index stored in `chroma_db/` & `bm25.pkl`.
+  - PyPDF index stored in MongoDB Atlas & `bm25.pkl`.
   - LlamaParse index stored in `chroma_db_llamaparse/` & `bm25_llamaparse.pkl`.
   - Seamless index switching directly from the Streamlit sidebar.
 - **Advanced Retrieval & Reranking**:
-  - **HyDE**: Expands queries by generating hypothetical zero-shot answers before retrieval.
-  - **Hybrid Search**: Fuses dense semantic search (ChromaDB) with sparse keyword matching (BM25).
-  - **RRF & Cohere Rerank**: Merges scores via Reciprocal Rank Fusion ($k=60$) and reranks top 20 candidates down to top 5.
+  - **Hybrid Search**: Fuses dense semantic search (MongoDB Atlas Vector Search) with sparse keyword matching (BM25).
+  - **RRF & Cohere Rerank**: Merges scores via Reciprocal Rank Fusion ($k=60$) and reranks top candidates down to top 5.
 - **Live & Offline RAGAS 0.4.3 Evaluation**:
   - Evaluates each query live on Faithfulness, Answer Relevancy, and Context Utilization.
   - Built-in Streamlit dashboard tracking session averages, trend charts, and latency logs.
@@ -52,10 +51,9 @@ No system is perfect, and here are the honest trade-offs and areas currently bei
 | :--- | :--- |
 | **LLM** | NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`) |
 | **Embeddings** | NVIDIA NIM (`nvidia/llama-nemotron-embed-vl-1b-v2`) |
-| **Vector DB** | ChromaDB (`chroma_db/` & `chroma_db_llamaparse/`) |
+| **Vector DB** | MongoDB Atlas Vector Search & ChromaDB |
 | **Sparse Search** | BM25 (`rank-bm25`) |
 | **Reranker** | Cohere (`rerank-english-v3.0`) |
-| **Query Expansion**| HyDE |
 | **PDF Parser** | LlamaParse (Markdown result) & PyPDF |
 | **Evaluation** | RAGAS 0.4.3 (Faithfulness, Relevancy, Context Utilization) |
 | **UI** | Streamlit |
@@ -68,11 +66,10 @@ No system is perfect, and here are the honest trade-offs and areas currently bei
 RAG/
 ├── src/
 │   ├── config.py                 # Paths, models, chunk sizes, and API config
-│   ├── ingestion.py              # PyPDF loading, chunking, and Chroma/BM25 indexing
+│   ├── ingestion.py              # PyPDF loading, chunking, and MongoDB Atlas/BM25 indexing
 │   ├── markdown_ingestion.py     # LlamaParse markdown loading, header chunking, and indexing
 │   ├── llamaparse_ingestion.py   # LlamaParse PDF-to-Markdown parser script
 │   ├── retrieval.py              # Hybrid search, RRF merging, Cohere reranking
-│   ├── hyde.py                   # Hypothetical Document Embeddings (HyDE) expansion
 │   ├── generation.py             # Grounded prompt template, LLM generation, source citation
 │   └── eval_ragas.py             # RAGAS 0.4.3 evaluation logic
 ├── eval_workflow/
@@ -135,7 +132,7 @@ LLAMA_CLOUD_API_KEY=your_llama_cloud_api_key_here
 streamlit run app.py
 ```
 - Switch between **LlamaParse** and **PyPDF** collections in the sidebar.
-- Toggle **HyDE**, **Source Chunks**, and **Live RAGAS evaluation** on demand.
+- Toggle **Source Chunks** and **Live RAGAS evaluation** on demand.
 - View real-time scores and aggregate trends under the **RAGAS Evaluation** tab.
 
 ### 3. Run with Docker (Alternative)
