@@ -17,7 +17,7 @@ MONGO_VECTOR_INDEX_NAME       = "vector_index"
 MONGO_SEARCH_INDEX_NAME       = "search_index"
 
 # Models
-EMBED_MODEL = "nvidia/llama-nemotron-embed-vl-1b-v2"
+EMBED_MODEL = "nvidia/nemotron-3.5-embed-1b"
 LLM_MODEL   = "nvidia/nemotron-3.5-lightning-30b-a3b"
 
 # Chunking

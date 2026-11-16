@@ -50,7 +50,7 @@ No system is perfect, and here are the honest trade-offs and areas currently bei
 | Component | Tool / Model |
 | :--- | :--- |
 | **LLM** | NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`) |
-| **Embeddings** | NVIDIA NIM (`nvidia/llama-nemotron-embed-vl-1b-v2`) |
+| **Embeddings** | NVIDIA NIM (`nvidia/nemotron-3.5-embed-1b`) |
 | **Vector DB** | MongoDB Atlas Vector Search & ChromaDB |
 | **Sparse Search** | BM25 (`rank-bm25`) |
 | **Reranker** | Cohere (`rerank-english-v3.0`) |
