@@ -6,3 +6,14 @@ What is HyDE, and how does hypothetical document generation improve retrieval?
 What is Agentic RAG, and how does it differ from conventional RAG? 
 What are the main types of memory discussed for LLM agents?
 How do ReAct and Reflexion differ in their approaches to agent reasoning and action?
+
+SET-2
+
+What is A-RAG, and how do its hierarchical retrieval interfaces improve agentic retrieval?
+What is ToolLLM, and how does it enable LLMs to master thousands of real-world APIs?
+What is PlanBench, and what does it reveal about the planning capabilities of LLMs?
+What are the key dimensions of multi-agent collaboration mechanisms in LLM-based systems?
+What is Human-AI Copilot Optimization (HACO), and how does it ensure training safety without environmental rewards?
+What are the primary bottlenecks identified when evaluating LLM agents on long-form database question answering with SQL?
+What systemic risks and reliability challenges are inherent to autonomous Agentic RAG loops?
+How do Self-RAG and A-RAG differ in how the language model controls the retrieval process?
