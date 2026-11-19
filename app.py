@@ -29,16 +29,27 @@ st.title("KNOWLEDGE RAG")
 def render_error_ui(error_info: dict) -> None:
     """Render a compact, clear UI card for request timeouts and API errors."""
     is_timeout = error_info.get("is_timeout", False)
+    is_overloaded = error_info.get("is_overloaded", False)
     stage = html.escape(error_info.get("stage", "Request"))
     timestamp = html.escape(error_info.get("timestamp", ""))
     log_file = html.escape(error_info.get("log_file", "logs/app.log"))
 
-    if is_timeout:
+    if is_overloaded:
+        border_color = "#f97316"
+        bg_color = "rgba(249, 115, 22, 0.10)"
+        badge_bg = "rgba(249, 115, 22, 0.22)"
+        badge_text = "#fb923c"
+        title = "API Service Overloaded (503 / Rate Limit)"
+        message = (
+            f"The remote NVIDIA NIM service is temporarily overloaded during <strong>{stage}</strong>. "
+            "Retries were attempted automatically; please wait a few seconds and try submitting your question again."
+        )
+    elif is_timeout:
         border_color = "#f59e0b"
         bg_color = "rgba(245, 158, 11, 0.10)"
         badge_bg = "rgba(245, 158, 11, 0.22)"
         badge_text = "#fbbf24"
-        title = "⏱️ Request Timeout Error"
+        title = "Request Timeout Error"
         message = (
             f"The request timed out during <strong>{stage}</strong>. "
             "The remote API did not respond in time — please try again."
@@ -48,7 +59,7 @@ def render_error_ui(error_info: dict) -> None:
         bg_color = "rgba(239, 68, 68, 0.10)"
         badge_bg = "rgba(239, 68, 68, 0.22)"
         badge_text = "#f87171"
-        title = "⚠️ Request Failed"
+        title = "Request Failed"
         message = (
             f"An error occurred during <strong>{stage}</strong>. "
             "Please check your connection or API settings and try again."
@@ -303,7 +314,7 @@ with chat_tab:
                 except Exception as e:
                     ragas_err = log_api_error("RAGAS Evaluation", e, query=question)
                     if ragas_err["is_timeout"]:
-                        st.warning(f"⏱️ RAGAS evaluation timed out (logged to `{ragas_err['log_file']}`).")
+                        st.warning(f"RAGAS evaluation timed out (logged to `{ragas_err['log_file']}`).")
                     else:
                         logger.warning("RAGAS evaluation skipped: %s", e)
 

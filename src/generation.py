@@ -5,11 +5,15 @@
 import logging
 import random
 import time
+import warnings
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from src.config import NVIDIA_API_KEY, LLM_MODEL
+
+# Suppress benign model type classification warning from langchain_nvidia_ai_endpoints
+warnings.filterwarnings("ignore", category=UserWarning, module="langchain_nvidia_ai_endpoints")
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +138,12 @@ def generate_answer(question: str, docs: list[Document]) -> str:
     """
     Generates a grounded RAG answer with exponential backoff retry and fast fatal-error failure.
     """
+    if not docs:
+        return "I could not find this in the provided papers."
+
     context = format_docs(docs)
 
-    for attempt in range(3):
+    for attempt in range(4):
         try:
             return rag_chain.invoke({
                 "question": question,
@@ -149,11 +156,13 @@ def generate_answer(question: str, docs: list[Document]) -> str:
                 logger.error("Non-retryable generation error: %s", e)
                 raise e
 
-            if attempt == 2:
+            if attempt == 3:
                 logger.error("Max generation retry attempts reached: %s", e)
                 raise e
 
-            # Exponential backoff with jitter
-            backoff = min(0.5 * (2 ** attempt), 2.0) + random.uniform(0.05, 0.2)
+            # Exponential backoff with jitter (longer delay for transient server 503 / 429 overloads)
+            is_overloaded = any(k in err_str for k in ["503", "overloaded", "429", "rate limit"])
+            base = 1.5 if is_overloaded else 0.8
+            backoff = min(base * (2 ** attempt), 6.0) + random.uniform(0.1, 0.4)
             logger.warning("Generation attempt %d failed (%s). Retrying in %.2fs...", attempt + 1, e, backoff)
             time.sleep(backoff)

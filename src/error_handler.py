@@ -76,6 +76,34 @@ def is_timeout_error(exc: Exception) -> bool:
     return False
 
 
+def is_overloaded_error(exc: Exception) -> bool:
+    """Return True if the exception or any in its chain is a 503 Overloaded or 429 Rate Limit error."""
+    visited = set()
+    current = exc
+
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        msg = str(current).lower()
+        if any(
+            marker in msg
+            for marker in (
+                "503",
+                "service is overloaded",
+                "server is overloaded",
+                "overloaded",
+                "429",
+                "too many requests",
+                "rate limit",
+                "504 gateway",
+                "502 bad gateway",
+            )
+        ):
+            return True
+        current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
+
+    return False
+
+
 def _extract_timeout_meta(exc: Exception) -> tuple[str | None, str | None]:
     """Extract host and timeout duration (seconds) across the exception chain if present."""
     visited = set()
@@ -108,6 +136,7 @@ def log_api_error(stage: str, exc: Exception, query: str | None = None) -> dict:
     """
     logger = setup_logging()
     timeout = is_timeout_error(exc)
+    overloaded = is_overloaded_error(exc)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     host, timeout_sec = _extract_timeout_meta(exc)
 
@@ -119,6 +148,15 @@ def log_api_error(stage: str, exc: Exception, query: str | None = None) -> dict:
             query_preview,
             host or "unknown",
             timeout_sec or "unknown",
+            type(exc).__name__,
+            exc,
+            exc_info=True,
+        )
+    elif overloaded:
+        logger.error(
+            "SERVICE OVERLOADED (503/429) during [%s]%s | error=%s: %s",
+            stage,
+            query_preview,
             type(exc).__name__,
             exc,
             exc_info=True,
@@ -135,6 +173,7 @@ def log_api_error(stage: str, exc: Exception, query: str | None = None) -> dict:
 
     return {
         "is_timeout": timeout,
+        "is_overloaded": overloaded,
         "stage": stage,
         "timestamp": timestamp,
         "host": host,

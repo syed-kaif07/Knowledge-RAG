@@ -1,7 +1,9 @@
 # src/retrieval.py
 import hashlib
 import logging
+import random
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from langchain_cohere import CohereRerank
 from src.config import (
@@ -79,10 +81,52 @@ def reciprocal_rank_fusion(dense_docs, sparse_docs, k=60):
     return [doc_map[k] for k in sorted_keys]
 
 
+def _fetch_dense_with_retry(dense, query: str, max_retries: int = 3):
+    """
+    Executes dense retrieval with exponential backoff retry for transient API errors (503, 429, timeouts).
+    Falls back gracefully to an empty list so BM25 keyword search can still fulfill the query.
+    """
+    for attempt in range(max_retries):
+        try:
+            return dense.invoke(query)
+        except Exception as e:
+            err_str = str(e).lower()
+            # Fast fail on non-retryable authentication or client config errors
+            if any(fatal in err_str for fatal in ["401", "403", "unauthorized", "invalid_api_key"]):
+                logger.error("Non-retryable dense retrieval error: %s", e)
+                raise e
+
+            if attempt == max_retries - 1:
+                logger.warning(
+                    "Dense retrieval failed after %d attempts (%s). Gracefully falling back to BM25 sparse results.",
+                    max_retries, e
+                )
+                return []
+
+            is_overload = any(k in err_str for k in ["503", "overload", "429", "rate limit"])
+            base = 1.2 if is_overload else 0.7
+            backoff = min(base * (1.8 ** attempt), 5.0) + random.uniform(0.1, 0.4)
+            logger.warning(
+                "Dense retrieval attempt %d failed (%s). Retrying in %.2fs...",
+                attempt + 1, e, backoff
+            )
+            time.sleep(backoff)
+    return []
+
+
+def _fetch_sparse_safe(sparse, query: str):
+    """Safe execution of local BM25 sparse search."""
+    try:
+        return sparse.invoke(query)
+    except Exception as e:
+        logger.warning("Sparse retrieval failed: %s", e)
+        return []
+
+
 def retrieve(query, vectorstore, bm25_retriever, use_rerank=True):
     """
     Optimized hybrid retrieval pipeline:
-    1. Parallel execution of Dense (vector) and Sparse (BM25/Search) search.
+    1. Parallel execution of Dense (vector) with backoff retry and Sparse (BM25) search.
     2. Reciprocal Rank Fusion (RRF) with stable document deduplication.
     3. Candidate pool capping (top 15) to minimize WAN payload to Cohere.
     4. Reranking via thread-safe singleton Cohere client with explicit top_n capping.
@@ -92,10 +136,14 @@ def retrieve(query, vectorstore, bm25_retriever, use_rerank=True):
 
     # 1. Fetch dense and sparse results concurrently in background threads
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_dense = executor.submit(dense.invoke, query)
-        future_sparse = executor.submit(sparse.invoke, query)
+        future_dense = executor.submit(_fetch_dense_with_retry, dense, query)
+        future_sparse = executor.submit(_fetch_sparse_safe, sparse, query)
         dense_docs = future_dense.result()
         sparse_docs = future_sparse.result()
+
+    # If both dense and sparse returned nothing, raise error so UI can display it
+    if not dense_docs and not sparse_docs:
+        raise RuntimeError("Both dense vector search and sparse BM25 search failed to retrieve any documents.")
 
     # 2. Merge with Reciprocal Rank Fusion
     merged = reciprocal_rank_fusion(dense_docs, sparse_docs)
