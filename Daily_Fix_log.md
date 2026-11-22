@@ -45,9 +45,28 @@ Will attempt to retreive and generate 3 times if fails 3 times then model will u
 
 4. Drawbacks 
 
-Less content ore varied generation results. (observed)
+Less context or varied generation results. (observed)
 
 modified : retrieval.py, generation.py, error_handler.py
 
+-----------------------------------------
 
+22-Nov-2026 - 'Nvidia API failure fallbacks to Groq API in only 1 failure'
 
+1. Issue 
+
+Nvidia's API fails are common so made a fallback to groq that system don't fail.
+
+2. Fixed 
+
+failure Fallback issue
+
+3. Result
+
+No dependency on NVIDIA 
+
+4. Drawback 
+
+Failure of Groq might happen so if Groq fails system will automatically fallback to BM25 search.
+
+modified : generation.py, config.py

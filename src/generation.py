@@ -10,7 +10,10 @@ from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
-from src.config import NVIDIA_API_KEY, LLM_MODEL
+from src.config import (
+    NVIDIA_API_KEY, LLM_MODEL,
+    GROQ_API_KEY, GROQ_LLM_MODEL
+)
 
 # Suppress benign model type classification warning from langchain_nvidia_ai_endpoints
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_nvidia_ai_endpoints")
@@ -99,24 +102,34 @@ def build_llm():
     )
 
 
-# module-level instance — used for actual answer generation
-llm = build_llm()
+_llm_instance = None
+_judge_llm_instance = None
+_rag_chain_instance = None
 
-# separate deterministic instance for faithfulness judging.
-# temperature=0.1 on the generation llm was causing the judge to flip
-# verdicts on borderline claims between identical runs, which made the
-# faithfulness score swing wildly (e.g. 30% vs 57% on the same question).
-# temperature=0.0 makes the judge's yes/no calls consistent run to run.
-judge_llm = ChatNVIDIA(
-    model=LLM_MODEL,
-    api_key=NVIDIA_API_KEY,
-    max_tokens=100,
-    temperature=0.0,
-)
+
+def get_llm():
+    """Returns cached ChatNVIDIA client singleton, initialized lazily."""
+    global _llm_instance
+    if _llm_instance is None:
+        _llm_instance = build_llm()
+    return _llm_instance
+
+
+def get_judge_llm():
+    """Returns deterministic LLM instance for judging."""
+    global _judge_llm_instance
+    if _judge_llm_instance is None:
+        _judge_llm_instance = ChatNVIDIA(
+            model=LLM_MODEL,
+            api_key=NVIDIA_API_KEY,
+            max_tokens=100,
+            temperature=0.0,
+        )
+    return _judge_llm_instance
 
 
 def _parse_llm_response(message) -> str:
-    """Extracts text content from ChatNVIDIA message, with fallback for reasoning models."""
+    """Extracts text content from message, with fallback for reasoning models."""
     if hasattr(message, "content") and message.content:
         return str(message.content)
     # Fallback if reasoning model output only populated reasoning_content
@@ -125,18 +138,61 @@ def _parse_llm_response(message) -> str:
     return str(message)
 
 
-def build_rag_chain():
-    return RAG_PROMPT | llm | _parse_llm_response
+def get_rag_chain():
+    """Returns cached primary NVIDIA RAG chain."""
+    global _rag_chain_instance
+    if _rag_chain_instance is None:
+        _rag_chain_instance = RAG_PROMPT | get_llm() | _parse_llm_response
+    return _rag_chain_instance
+
+# Groq fallback chain singleton
+_groq_chain_instance = None
 
 
-# Pre-compiled module-level chain — eliminates recompilation per query
-rag_chain = build_rag_chain()
+def get_groq_chain():
+    """Builds and caches the secondary fallback Groq RAG chain."""
+    global _groq_chain_instance
+    if _groq_chain_instance is None and GROQ_API_KEY:
+        try:
+            from langchain_groq import ChatGroq
+            groq_llm = ChatGroq(
+                model=GROQ_LLM_MODEL,
+                api_key=GROQ_API_KEY,
+                max_tokens=4096,
+                temperature=0.1,
+            )
+            _groq_chain_instance = RAG_PROMPT | groq_llm | _parse_llm_response
+        except Exception as e:
+            logger.warning("Failed to initialize Groq fallback client: %s", e)
+    return _groq_chain_instance
 
+
+def _invoke_groq_fallback(question: str, context: str) -> str | None:
+    """Invokes Groq when NVIDIA fails on attempt 1."""
+    groq_chain = get_groq_chain()
+    if groq_chain is None:
+        logger.info("Groq fallback skipped (GROQ_API_KEY not configured or client failed).")
+        return None
+    try:
+        logger.info("Executing immediate fallback to Groq (%s)...", GROQ_LLM_MODEL)
+        ans = groq_chain.invoke({
+            "question": question,
+            "context": context,
+        })
+        logger.info("Groq fallback generation succeeded.")
+        return ans
+    except Exception as ge:
+        logger.warning("Groq fallback generation failed (%s). Continuing NVIDIA retries.", ge)
+        return None
 
 
 def generate_answer(question: str, docs: list[Document]) -> str:
     """
-    Generates a grounded RAG answer with exponential backoff retry and fast fatal-error failure.
+    Generates a grounded RAG answer.
+    Resilience flow:
+    1. Primary attempt with NVIDIA NIM.
+    2. If NVIDIA NIM fails on attempt 1, immediately attempt failover to Groq.
+    3. If Groq is unavailable or fails, continue NVIDIA retries with exponential backoff.
     """
     if not docs:
         return "I could not find this in the provided papers."
@@ -145,7 +201,8 @@ def generate_answer(question: str, docs: list[Document]) -> str:
 
     for attempt in range(4):
         try:
-            return rag_chain.invoke({
+            primary_chain = get_rag_chain()
+            return primary_chain.invoke({
                 "question": question,
                 "context": context,
             })
@@ -156,6 +213,13 @@ def generate_answer(question: str, docs: list[Document]) -> str:
                 logger.error("Non-retryable generation error: %s", e)
                 raise e
 
+            # Immediate fallback to Groq on attempt 1 failure
+            if attempt == 0:
+                logger.warning("NVIDIA generation attempt 1 failed (%s). Attempting immediate fallback to Groq...", e)
+                groq_answer = _invoke_groq_fallback(question, context)
+                if groq_answer:
+                    return groq_answer
+
             if attempt == 3:
                 logger.error("Max generation retry attempts reached: %s", e)
                 raise e
@@ -164,5 +228,5 @@ def generate_answer(question: str, docs: list[Document]) -> str:
             is_overloaded = any(k in err_str for k in ["503", "overloaded", "429", "rate limit"])
             base = 1.5 if is_overloaded else 0.8
             backoff = min(base * (2 ** attempt), 6.0) + random.uniform(0.1, 0.4)
-            logger.warning("Generation attempt %d failed (%s). Retrying in %.2fs...", attempt + 1, e, backoff)
+            logger.warning("NVIDIA generation attempt %d failed (%s). Retrying in %.2fs...", attempt + 1, e, backoff)
             time.sleep(backoff)

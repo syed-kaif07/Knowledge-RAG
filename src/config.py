@@ -7,6 +7,7 @@ load_dotenv()
 # API Keys & Database URI
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+GROQ_API_KEY   = os.getenv("GROQ_API_KEY")
 MONGO_URI      = os.getenv("MONGO_URI")
 
 # MongoDB Atlas Configuration
@@ -17,8 +18,9 @@ MONGO_VECTOR_INDEX_NAME       = "vector_index"
 MONGO_SEARCH_INDEX_NAME       = "search_index"
 
 # Models
-EMBED_MODEL = "nvidia/nemotron-3.5-embed-1b"
-LLM_MODEL   = "nvidia/nemotron-3.5-lightning-30b-a3b"
+EMBED_MODEL    = "nvidia/nemotron-3.5-embed-1b"
+LLM_MODEL      = "nvidia/nemotron-3.5-lightning-30b-a3b"
+GROQ_LLM_MODEL = "llama-3.3-70b-versatile"
 
 # Chunking
 CHUNK_SIZE    = 900
