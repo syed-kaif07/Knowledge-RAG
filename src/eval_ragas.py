@@ -1,6 +1,7 @@
 # src/eval_ragas.py
 # RAGAS 0.4.3 Online Evaluation Module
 
+import math
 import sys
 import types
 import warnings
@@ -51,6 +52,23 @@ def get_evaluator_embeddings():
     )
 
 
+def _clean_metric_score(val) -> float:
+    """
+    Safely converts a Ragas metric score to a float clamped between 0.0 and 1.0.
+    Handles NaN, None, inf, and conversion errors by returning 0.0 rather
+    than erroneously converting NaN to 1.0 via min/max.
+    """
+    if val is None:
+        return 0.0
+    try:
+        score = float(val)
+        if math.isnan(score) or math.isinf(score):
+            return 0.0
+        return round(max(0.0, min(1.0, score)), 4)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def evaluate_query_ragas(user_query: str, answer: str, contexts: list[str]) -> dict:
     """
     Evaluates a single RAG query response using Ragas 0.4.3 metrics:
@@ -88,14 +106,10 @@ def evaluate_query_ragas(user_query: str, answer: str, contexts: list[str]) -> d
 
         scores = eval_result.to_pandas().iloc[0]
 
-        faithfulness_score = float(scores.get("faithfulness", 0.0))
-        relevancy_score = float(scores.get("answer_relevancy", 0.0))
-        utilization_score = float(scores.get("llm_context_precision_without_reference", 0.0))
-
         return {
-            "faithfulness": round(max(0.0, min(1.0, faithfulness_score)), 4),
-            "answer_relevancy": round(max(0.0, min(1.0, relevancy_score)), 4),
-            "context_utilization": round(max(0.0, min(1.0, utilization_score)), 4),
+            "faithfulness": _clean_metric_score(scores.get("faithfulness")),
+            "answer_relevancy": _clean_metric_score(scores.get("answer_relevancy")),
+            "context_utilization": _clean_metric_score(scores.get("llm_context_precision_without_reference")),
         }
 
     except Exception as e:
