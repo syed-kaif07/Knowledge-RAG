@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Knowledge RAG</title>
+  <link rel="stylesheet" href="/static/style.css?v=5.0" />
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Left Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">Knowledge RAG</div>
+          <div class="brand-tag">Research Paper Assistant</div>
+        </div>
+      </div>
+
+      <!-- System Status Indicator -->
+      <div id="system-status-box" class="status-box">
+        <div class="status-indicator"></div>
+        <span id="system-status-text">Checking system status...</span>
+      </div>
+
+      <!-- Collection Mode -->
+      <div class="sidebar-section">
+        <div class="section-label">Knowledge Base Settings</div>
+        <div class="radio-group">
+          <label class="radio-label selected">
+            <input type="radio" name="index_mode" value="llamaparse" checked />
+            <span class="radio-custom"></span>
+            <span class="radio-text">LlamaParse (Markdown Docs)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="index_mode" value="pypdf" />
+            <span class="radio-custom"></span>
+            <span class="radio-text">PyPDF (Standard Docs)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Ingestion & Upload -->
+      <div class="sidebar-section">
+        <div class="section-label">Upload &amp; Ingestion</div>
+        <div class="upload-area">
+          <input type="file" id="pdf-upload" accept=".pdf" multiple />
+          <button type="button" id="btn-upload" class="btn-ghost btn-block">Upload PDFs</button>
+        </div>
+        <button type="button" id="btn-index" class="btn-primary btn-block">Index Documents</button>
+        <div id="ingest-status" class="helper-text"></div>
+      </div>
+
+      <!-- Preferences -->
+      <div class="sidebar-section">
+        <div class="section-label">Preferences</div>
+        <div class="toggle-group">
+          <label class="toggle-label">
+            <span class="toggle-switch">
+              <input type="checkbox" id="toggle-sources" checked />
+              <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-text">Show source chunks</span>
+          </label>
+          <label class="toggle-label">
+            <span class="toggle-switch">
+              <input type="checkbox" id="toggle-eval" />
+              <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-text">Run live RAGAS evaluation</span>
+          </label>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <h1 id="greeting">Good evening.</h1>
+          <p class="subtitle">Your AI &amp; ML research paper knowledge base.</p>
+        </div>
+        <!-- Tab Navigation -->
+        <nav class="tab-navigation">
+          <button class="nav-tab active" data-tab="chat">Chat</button>
+          <button class="nav-tab" data-tab="eval">RAGAS Evaluation</button>
+          <button class="nav-tab" data-tab="reviewer">Reviewer Briefing</button>
+        </nav>
+      </header>
+
+      <!-- View 1: Chat -->
+      <section id="tab-chat" class="tab-pane active">
+        <div id="chat-messages" class="chat-container">
+          <div class="message-row assistant-row">
+            <div class="message-body assistant-body">
+              <p>Welcome to Knowledge RAG. Ask any question about your indexed machine learning and agent research papers.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-wrapper">
+          <form id="chat-form" class="chat-form">
+            <button type="button" id="btn-input-upload" class="input-action-btn" title="Upload PDF paper">+</button>
+            <input
+              type="text"
+              id="user-input"
+              placeholder="Ask Knowledge RAG..."
+              autocomplete="off"
+              required
+            />
+            <button type="submit" id="btn-send" class="btn-send-pill">Ask</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- View 2: RAGAS Evaluation Dashboard -->
+      <section id="tab-eval" class="tab-pane">
+        <div class="section-head">
+          <div>
+            <h2>RAGAS 0.4.3 Evaluation Dashboard</h2>
+            <p class="section-desc">Automated evaluation of answer faithfulness, query relevancy, and context utilization.</p>
+          </div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-label">Avg Faithfulness</span>
+            <span id="metric-avg-faith" class="metric-value">--%</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Avg Answer Relevancy</span>
+            <span id="metric-avg-rel" class="metric-value">--%</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Avg Context Utilization</span>
+            <span id="metric-avg-util" class="metric-value">--%</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Total Evaluated</span>
+            <span id="metric-total-eval" class="metric-value">0</span>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <h3>Evaluated Queries Log</h3>
+          <div id="eval-history-list" class="eval-list">
+            <p class="empty-state">No queries evaluated in this session yet. Enable 'Run live RAGAS evaluation' in the sidebar to score responses in real time.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 3: Reviewer Briefing -->
+      <section id="tab-reviewer" class="tab-pane">
+        <div class="section-head">
+          <div>
+            <h2>Daily Reviewer Agent</h2>
+            <p class="section-desc">Automated system health briefing analyzing telemetry logs, corpus health, and technical debt.</p>
+          </div>
+          <button type="button" id="btn-refresh-reviewer" class="btn-ghost">Refresh Briefing</button>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-label">503 Overloads</span>
+            <span id="rev-503" class="metric-value">0</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Request Timeouts</span>
+            <span id="rev-timeouts" class="metric-value">0</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Groq Failovers</span>
+            <span id="rev-groq" class="metric-value">0</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Pending Unindexed</span>
+            <span id="rev-unindexed" class="metric-value">0</span>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <h3>System Briefing</h3>
+          <pre id="reviewer-briefing-text" class="briefing-box">Loading daily system briefing...</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js?v=5.0"></script>
+</body>
+</html>

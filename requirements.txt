@@ -9,7 +9,6 @@ chromadb==1.5.9
 rank-bm25==0.2.2
 cohere==5.18.0
 ragas==0.4.3
-streamlit==1.58.0
 python-dotenv==1.2.2
 pypdf==6.14.2
 langchain-classic==1.0.8
@@ -18,3 +17,7 @@ llama-parse
 pymongo>=4.6.0
 langchain-mongodb>=0.2.0
 langchain-groq>=1.0.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.12
+

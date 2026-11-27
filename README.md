@@ -28,13 +28,13 @@ No system is perfect, and here are the honest trade-offs and areas currently bei
 - **Isolated Vector & Sparse Indices**:
   - PyPDF index stored in MongoDB Atlas & `bm25.pkl`.
   - LlamaParse index stored in `chroma_db_llamaparse/` & `bm25_llamaparse.pkl`.
-  - Seamless index switching directly from the Streamlit sidebar.
+  - Seamless index switching directly from the sidebar.
 - **Advanced Retrieval & Reranking**:
   - **Hybrid Search**: Fuses dense semantic search (MongoDB Atlas Vector Search) with sparse keyword matching (BM25).
   - **RRF & Cohere Rerank**: Merges scores via Reciprocal Rank Fusion ($k=60$) and reranks top candidates down to top 5.
 - **Live & Offline RAGAS 0.4.3 Evaluation**:
   - Evaluates each query live on Faithfulness, Answer Relevancy, and Context Utilization.
-  - Built-in Streamlit dashboard tracking session averages, trend charts, and latency logs.
+  - Built-in evaluation dashboard tracking session averages, trend charts, and latency logs.
   - Standalone 20-question benchmark runner (`eval_workflow/run_baseline_eval.py`).
 
 ---
@@ -56,7 +56,7 @@ No system is perfect, and here are the honest trade-offs and areas currently bei
 | **Reranker** | Cohere (`rerank-english-v3.0`) |
 | **PDF Parser** | LlamaParse (Markdown result) & PyPDF |
 | **Evaluation** | RAGAS 0.4.3 (Faithfulness, Relevancy, Context Utilization) |
-| **UI** | Streamlit |
+| **Frontend & API** | HTML5, CSS3, JavaScript & FastAPI |
 
 ---
 
@@ -82,7 +82,11 @@ RAG/
 ├── bm25_llamaparse.pkl           # LlamaParse BM25 index
 ├── parse_all_pdfs.py             # CLI script to parse all PDFs to markdown via LlamaParse
 ├── index_llamaparse.py           # CLI script to batch-index markdown documents
-├── app.py                         # Streamlit chat interface & evaluation dashboard
+├── server.py                     # FastAPI backend application & API routes
+├── frontend/                     # Custom HTML5, CSS3 & JavaScript frontend
+│   ├── index.html                # App layout (Chat, RAGAS Dashboard, Daily Briefing)
+│   ├── style.css                 # Dark theme responsive styling
+│   └── app.js                    # Client-side state, API calls, and chart rendering
 ├── Dockerfile                    # Container configuration (Python 3.12-slim)
 ├── .dockerignore                 # Excludes venv, caches, and secrets from image
 ├── requirements.txt              # Python dependencies
@@ -129,11 +133,13 @@ LLAMA_CLOUD_API_KEY=your_llama_cloud_api_key_here
 
 ### 2. Run the Web App (Locally)
 ```bash
-streamlit run app.py
+uvicorn server:app --host 127.0.0.1 --port 8000 --reload
 ```
+- Open `http://localhost:8000` in your browser.
 - Switch between **LlamaParse** and **PyPDF** collections in the sidebar.
 - Toggle **Source Chunks** and **Live RAGAS evaluation** on demand.
 - View real-time scores and aggregate trends under the **RAGAS Evaluation** tab.
+- Inspect daily reviewer health alerts under the **Daily Review** tab.
 
 ### 3. Run with Docker (Alternative)
 Run the entire application in an isolated container without installing Python dependencies locally:
@@ -145,15 +151,15 @@ Run the entire application in an isolated container without installing Python de
 
 2. **Run the container (passing your `.env` file):**
    ```bash
-   # Default port 8501:
-   docker run -p 8501:8501 --env-file .env knowledgerag
+   # Default port 8000:
+   docker run -p 8000:8000 --env-file .env knowledgerag
 
    # Or map to a custom port (e.g., 8080):
-   docker run -p 8080:8501 --env-file .env knowledgerag
+   docker run -p 8080:8000 --env-file .env knowledgerag
    ```
 
 3. **Access the application:**
-   Open `http://localhost:8501` (or `http://localhost:8080`) in your browser.
+   Open `http://localhost:8000` (or `http://localhost:8080`) in your browser.
 
 ### 4. Run Benchmark Evaluation
 ```bash

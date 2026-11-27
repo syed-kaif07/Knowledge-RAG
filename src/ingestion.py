@@ -52,7 +52,7 @@ def get_indexed_files():
     # track which files have already been indexed
     if not os.path.exists(INDEXED_FILES_LOG):
         return set()
-    with open(INDEXED_FILES_LOG, "r", encoding="utf-8") as f:
+    with open(INDEXED_FILES_LOG, "r", encoding="utf-8", errors="replace") as f:
         return set(line.strip() for line in f.readlines() if line.strip())
 
 

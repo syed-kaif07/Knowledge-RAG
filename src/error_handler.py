@@ -13,7 +13,7 @@ LOG_FILE = os.path.join(LOG_DIR, "app.log")
 def setup_logging() -> logging.Logger:
     """
     Configure file and console logging for the application and src modules.
-    Safe to call repeatedly across Streamlit reruns without duplicating handlers.
+    Safe to call repeatedly across application requests without duplicating handlers.
     """
     os.makedirs(LOG_DIR, exist_ok=True)
 
